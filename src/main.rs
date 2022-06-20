@@ -10,13 +10,18 @@ use std::sync::{Arc, RwLock};
 use crate::args::Rgb;
 use crate::fstools::get_file_as_byte_vec;
 use crate::chip8::Chip8;
-use crate::input::parse_input;
 
 #[macro_use]
 extern crate savefile_derive;
 extern crate savefile;
 
-extern crate glium;
+use input::parse_input;
+use pixels::{Pixels, SurfaceTexture};
+use winit::{
+    event::{Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    window::WindowBuilder,
+};
 
 fn main() {
 
@@ -85,53 +90,50 @@ fn main() {
     });
 
     // setup opengl
-    use glium::glutin;
-    let event_loop = glutin::event_loop::EventLoop::new();
-    let wb = glutin::window::WindowBuilder::new();
-    let cb = glutin::ContextBuilder::new();
-    let display = glium::Display::new(wb, cb, &event_loop).unwrap();
+    let event_loop = EventLoop::new();
+    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let mut pixels = {
+        let window_size = window.inner_size();
+        let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
+        Pixels::new(64, 32, surface_texture).unwrap()
+    };
+
     let eventloopchip8 = chip8arc.clone();
-    let mut last_next_frame_time = std::time::Instant::now();
 
     event_loop.run(move |ev, _, control_flow| {
-        let next_frame_time = std::time::Instant::now() + std::time::Duration::from_nanos(16_666_667);
-        
-        if last_next_frame_time <= std::time::Instant::now() {
-            render_texture_to_target(&eventloopchip8.read().unwrap().display, &display, &flags.fg, &flags.bg);
-            last_next_frame_time = next_frame_time;
-        }
+        *control_flow = ControlFlow::Wait;
 
-        *control_flow = glutin::event_loop::ControlFlow::WaitUntil(next_frame_time);
         match ev {
-            glutin::event::Event::WindowEvent { event, .. } => match event {
-                glutin::event::WindowEvent::CloseRequested => {
-                    *control_flow = glutin::event_loop::ControlFlow::Exit;
-                    return;
-                },
-                glutin::event::WindowEvent::KeyboardInput { device_id: _, input, is_synthetic: _ } => {
-                    // println!("{:?}", input.virtual_keycode.unwrap());
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                window_id,
+            } if window_id == window.id() => *control_flow = ControlFlow::Exit,
+            Event::RedrawRequested(_) => {
+                render_texture_to_target(&eventloopchip8.read().unwrap().display, pixels.get_frame(), &flags.fg, &flags.bg);
+                pixels.render().unwrap();
+            }
+            Event::WindowEvent { window_id: _, event: window_ev } => match window_ev {
+                WindowEvent::KeyboardInput {input, device_id: _, is_synthetic: _ } => {
                     parse_input(input, &mut eventloopchip8.write().unwrap(), &flags);
-                },
-                _ => return,
+                }
+                WindowEvent::Resized(size) => {
+                    pixels.resize_surface(size.width, size.height);
+                }
+                _ => ()
             },
             _ => (),
         }
+        window.request_redraw()
     });
 }
 
-fn render_texture_to_target(dispmem: &[u8; 2048], display: &glium::Display, fg: &Rgb, bg: &Rgb) {
-    use crate::glium::Surface;
-
-    let mut disptexturevec = vec![vec![(bg.r, bg.g, bg.b); 64]; 32];
-    for i in  0..dispmem.len() {
+fn render_texture_to_target(dispmem: &[u8; 2048], frame: &mut [u8], fg: &Rgb, bg: &Rgb) {
+    for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
         if dispmem[i] == 1 {
-            disptexturevec[31 - (i % 32)][i / 32] = (fg.r, fg.g, fg.b);
+            pixel.copy_from_slice(&[fg.r, fg.g, fg.b, 0xff]);
+        }
+        else {
+            pixel.copy_from_slice(&[bg.r, bg.g, bg.b, 0xff]);
         }
     }
-    let texture = glium::Texture2d::new(display, disptexturevec).unwrap();
-
-    let mut target = display.draw();
-    target.clear_color(0.0, 0.0, 0.0, 1.0);
-    texture.as_surface().fill(&target, glium::uniforms::MagnifySamplerFilter::Nearest);
-    target.finish().unwrap();
 }

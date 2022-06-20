@@ -97,9 +97,8 @@ pub fn parse_op(chip8: &mut Chip8) {
                     // if the sprite is not 0
                     if sprt & 0x0080 > 0 {
                         let disppixel = &mut chip8.display[(
-                            (vy as u16 + row) % 32 + 
-                            (vx as u16 + col) % 64 * 
-                            32
+                            ((vy as u16 + row) % 32) * 64 +
+                            (vx as u16 + col) % 64
                         ) as usize];
 
                         // set last register to 1 if pixel is set
