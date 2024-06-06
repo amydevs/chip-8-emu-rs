@@ -1,6 +1,7 @@
+use std::path::Path;
 use std::fs::{File, metadata};
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 
 use savefile::{save_file, load_file};
 
@@ -10,12 +11,11 @@ pub fn get_file_as_byte_vec(filename: &str) -> Vec<u8> {
     let mut f = File::open(filename).expect("no file found");
     let metadata = metadata(filename).expect("unable to read metadata");
     let mut buffer = vec![0; metadata.len() as usize];
-    f.read(&mut buffer).expect("buffer overflow");
-
+    f.read_exact(&mut buffer).expect("buffer overflow");
     buffer
 }
 
-pub fn save_state(filename: &PathBuf, chip8inst: &Chip8) {
+pub fn save_state(filename: &Path, chip8inst: &Chip8) {
     save_file(filename, 0, chip8inst).unwrap_or_else(|x| {
         println!("{}", x);
     });

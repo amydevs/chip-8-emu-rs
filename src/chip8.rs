@@ -71,14 +71,12 @@ impl Chip8 {
         chip8
     }
     fn load_fontset(&mut self) {
-        for i in 0..80 {
-            self.memory[i] = FONTSET[i];
+        for (i, font) in FONTSET.iter().enumerate() {
+            self.memory[i] = *font;
         }
     }
-    pub fn load_program(&mut self, program: &Vec<u8>) {
-        for i in 0..program.len() {
-            self.memory[0x200 + i] = program[i];
-        }
+    pub fn load_program(&mut self, program: &[u8]) {
+        self.memory[512..(program.len() + 512)].copy_from_slice(program);
     }
 
 
