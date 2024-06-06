@@ -221,19 +221,16 @@ pub fn parse_op(chip8: &mut Chip8) {
             if chip8.keystate[chip8.vregisters[x] as usize] != 0 {
                 chip8.pc += 2;
             }
-            return;
         },
         0xE0A1 => {
             // EXA1 - skip next instruction if key in VX is not pressed
             if chip8.keystate[chip8.vregisters[x] as usize] == 0 {
                 chip8.pc += 2;
             }
-            return;
         },
         0xF007 => {
             // FX07 - set VX to delay timer value
             chip8.vregisters[x] = chip8.delay_timer;
-            return;
         },
         0xF00A => {
             // FX0A - wait for keypress, store in VX
@@ -246,49 +243,41 @@ pub fn parse_op(chip8: &mut Chip8) {
                     chip8.pc -= 2;
                 }
             }
-            return;
         },
         0xF015 => {
             // FX15 - set delay timer to VX
             chip8.delay_timer = chip8.vregisters[x];
-            return;
         },
         0xF018 => {
             // FX18 - set sound timer to VX
             chip8.sound_timer = chip8.vregisters[x];
-            return;
         },
         0xF01E => {
             // FX1E - add VX to I, set to I
             chip8.i += chip8.vregisters[x] as u16;
-            return;
         },
         0xF029 => {
             // FX29 - set I to location of sprite for digit VX
             // multiplied by 5, as each sprite is 5 bytes long
             chip8.i = chip8.vregisters[x] as u16 * 5;
-            return;
         },
         0xF033 => {
             // FX33 - store BCD representation of VX in memory locations I, I+1, and I+2
             chip8.memory[chip8.i as usize] = (chip8.vregisters[x] / 100) % 10;
             chip8.memory[(chip8.i + 1) as usize] = (chip8.vregisters[x] / 10) % 10;
             chip8.memory[(chip8.i + 2) as usize] = chip8.vregisters[x] % 10;
-            return;
         },
         0xF055 => {
             // FX55 - store V0 to VX in memory starting at address I
             for index in 0..x {
                 chip8.memory[chip8.i as usize + index] = chip8.vregisters[index];
             }
-            return;
         },
         0xF065 => {
             // FX65 - read V0 to VX from memory starting at address I
             for index in 0..x {
                 chip8.vregisters[index] = chip8.memory[chip8.i as usize + index];
             }
-            return;
         },
         _ => {}
     }

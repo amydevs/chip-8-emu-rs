@@ -41,7 +41,7 @@ fn main() {
     // load rom/state into chip8inst
     let rompath = flags.rom_path.as_str();
     if rompath.ends_with(".state") {
-        crate::fstools::load_state(&std::path::Path::new(rompath).to_path_buf(), &mut chip8inst)
+        crate::fstools::load_state(std::path::Path::new(rompath), &mut chip8inst)
     }
     else {
         chip8inst.load_program(&get_file_as_byte_vec(rompath));
