@@ -10,7 +10,10 @@ mkShell {
     gcc
     rustfmt
     clippy
+    cmake
     # Deps
+    fontconfig
+    freetype
     pkg-config
     alsa-lib
     xorg.libX11
@@ -18,6 +21,8 @@ mkShell {
     xorg.libXrandr
     xorg.libXi
     libGL
+    vulkan-loader
+    udev
   ];
   # Don't set rpath for native addons
   NIX_DONT_SET_RPATH = true;
@@ -25,8 +30,12 @@ mkShell {
   RUST_SRC_PATH = "${rustPlatform.rustLibSrc}";
   PKG_CONFIG_PATH = "${pkgs.pkg-config}/lib/pkgconfig";
   LD_LIBRARY_PATH = lib.makeLibraryPath [
+    fontconfig
+    freetype
     alsa-lib
     libGL
+    vulkan-loader
+    udev
   ];
   shellHook = ''
 

@@ -18,9 +18,9 @@ impl Beeper {
             SampleFormat::I16 => run::<i16>(&device, &config, vol),
             SampleFormat::U16 => run::<u16>(&device, &config, vol),
         }?;
-        return Ok(Self {
+        Ok(Self {
             stream: streamres
-        });
+        })
     }
     pub fn play(&self) {
         self.stream.play().unwrap();
@@ -46,14 +46,14 @@ where
 
     let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
 
-    let stream = device.build_output_stream(
+    
+    device.build_output_stream(
         config,
         move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
             write_data(data, channels, &mut next_value)
         },
         err_fn,
-    );
-    return stream;
+    )
 }
 
 fn write_data<T>(output: &mut [T], channels: usize, next_sample: &mut dyn FnMut() -> f32)

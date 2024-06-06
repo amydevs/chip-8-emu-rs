@@ -7,11 +7,12 @@ authors = ["Amy Y"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-glium = "*"
+pixels = "0.9"
+winit = "0.27"
 rand = "0.8.5"
 clap = { version = "3.1.8", features = ["derive"] }
 
 savefile = "0.10"
 savefile-derive = "0.10"
 
-cpal = "*"
+cpal = "0.13"

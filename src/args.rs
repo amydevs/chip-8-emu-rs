@@ -56,9 +56,9 @@ Keypad:        Keyboard:
 }
 
 fn hex_to_rgb(hex: u32) -> Rgb {
-    return Rgb {
+    Rgb {
         r: (hex >> 16) as u8,
         g: (hex >> 8) as u8,
         b: hex as u8
-    };
+    }
 }
