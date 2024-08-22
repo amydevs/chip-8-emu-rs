@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learn WGPU</title>
+    <style>
+        canvas {
+            background-color: black;
+        }
+    </style>
+</head>
+
+<body id="wasm-example">
+  <script type="module">
+      import init, * as wasm from "./pkg/chip_8_emu.js";
+      await init();
+      const { Wasm } = wasm;
+      const resp = await fetch("/roms/airplane.ch8");
+      const emu = await Wasm.create(document.body, new Uint8Array(await resp.arrayBuffer()), {});
+      setTimeout(() => {
+        emu.stop();
+        console.log(emu);
+        // emu.stop();
+      }, 1000)
+  </script>
+  <div>
+</body>
+
+</html>

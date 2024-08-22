@@ -6,11 +6,14 @@ mkShell {
     gitAndTools.gh
     # Rust
     rustc
+    rustc-wasm32
     cargo
     gcc
+    llvmPackages.bintools
     rustfmt
     clippy
     cmake
+    wasm-pack
     # Deps
     fontconfig
     freetype
@@ -37,6 +40,7 @@ mkShell {
     vulkan-loader
     udev
   ];
+  CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_LINKER = "lld";
   shellHook = ''
 
   '';
