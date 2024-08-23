@@ -58,7 +58,7 @@ jobs:
         - name: Install Linux Deps
           run: |
             sudo apt-get install -yqq alsa libasound2-dev fontconfig libfontconfig-dev
-          if: ${{ endsWith(matrix.platform.target, 'linux-gnu') }}
+          if: ${{ endsWith(matrix.platform.target, 'linux-gnu') && !matrix.platform.use-cross }}
         - name: Install ${{ matrix.platform.target }} Toolchain
           run: rustup target add ${{ matrix.platform.target }}
         - name: Build ${{ matrix.platform.name }} binary

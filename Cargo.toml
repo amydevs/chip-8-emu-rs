@@ -43,9 +43,3 @@ gloo-timers = { version = "0.3", features = ["futures"] }
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
-
-[workspace.metadata.cross.target.aarch64-unknown-linux-gnu]
-pre-build = [
-    "dpkg --add-architecture $CROSS_DEB_ARCH",
-    "apt-get update && apt-get install -yqq alsa libasound2-dev fontconfig libfontconfig-dev"
-]
