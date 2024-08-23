@@ -2,5 +2,5 @@
 pre-build = [
     "dpkg --add-architecture $CROSS_DEB_ARCH",
     "apt-get update",
-    "apt-get install -yqq alsa libasound2-dev fontconfig libfontconfig1-dev"
+    "apt-get install -yqq alsa:aarch64 libasound2-dev:aarch64 fontconfig:aarch64 libfontconfig1-dev:aarch64"
 ]
