@@ -57,7 +57,7 @@ jobs:
             restore-keys: ${{ matrix.platform.target }}-cargo-
         - name: Install Linux Deps
           run: |
-            sudo apt-get install -yqq alsa libasound2-dev fontconfig libfontconfig1-dev
+            sudo apt-get install -yqq alsa libasound2-dev libfontconfig1-dev
           if: ${{ endsWith(matrix.platform.target, 'linux-gnu') && !matrix.platform.use-cross }}
         - name: Install ${{ matrix.platform.target }} Toolchain
           run: rustup target add ${{ matrix.platform.target }}
