@@ -1,11 +1,10 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs::{File, metadata};
 use std::io::Read;
-use std::path::{PathBuf};
 
+use chip_8_emu::chip8::Chip8;
 use savefile::{save_file, load_file};
 
-use crate::chip8::Chip8;
 
 pub fn get_file_as_byte_vec(filename: &str) -> Vec<u8> {
     let mut f = File::open(filename).expect("no file found");

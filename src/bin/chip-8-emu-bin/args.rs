@@ -1,21 +1,12 @@
-use clap::{Command, Arg};
+use chip_8_emu::options::{Options, RGB};
+use clap::{Arg, Command};
 
-pub struct Flags {
-    pub invert_colors: u8,
+pub struct BinArgs {
+    pub options: Options,
     pub rom_path: String,
-    pub hz: u64,
-    pub fg: Rgb,
-    pub bg: Rgb,
-    pub vol: f32
 }
 
-pub struct Rgb {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8
-}
-
-pub fn parse_args() -> Flags {
+pub fn parse_args() -> BinArgs {
     let m = Command::new(env!("CARGO_PKG_NAME"))
     .author(env!("CARGO_PKG_AUTHORS"))
     .version(env!("CARGO_PKG_VERSION"))
@@ -45,18 +36,20 @@ Keypad:        Keyboard:
 ---------      ---------")
     .get_matches();
 
-    return Flags {
-        invert_colors: m.is_present("invert_colors") as u8,
+    return BinArgs {
+        options: Options {
+            invert_colors: m.is_present("invert_colors") as u8,
+            hz: m.value_of("hz").unwrap().parse::<u64>().unwrap(),
+            fg: hex_to_rgb(u32::from_str_radix(m.value_of("foreground_color").unwrap(), 16).unwrap()),
+            bg: hex_to_rgb(u32::from_str_radix(m.value_of("background_color").unwrap(), 16).unwrap()),
+            vol: m.value_of("volume").unwrap().parse::<f32>().unwrap()
+        },
         rom_path: m.value_of("rom_path").unwrap().to_string(),
-        hz: m.value_of("hz").unwrap().parse::<u64>().unwrap(),
-        fg: hex_to_rgb(u32::from_str_radix(m.value_of("foreground_color").unwrap(), 16).unwrap()),
-        bg: hex_to_rgb(u32::from_str_radix(m.value_of("background_color").unwrap(), 16).unwrap()),
-        vol: m.value_of("volume").unwrap().parse::<f32>().unwrap()
     };
 }
 
-fn hex_to_rgb(hex: u32) -> Rgb {
-    Rgb {
+fn hex_to_rgb(hex: u32) -> RGB {
+    RGB {
         r: (hex >> 16) as u8,
         g: (hex >> 8) as u8,
         b: hex as u8

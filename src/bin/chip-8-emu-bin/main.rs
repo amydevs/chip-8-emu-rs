@@ -1,45 +1,33 @@
-mod chip8;
-mod opcode_parser;
 mod fstools;
-mod input;
-mod audio;
 mod args;
 
 use std::sync::{Arc, RwLock};
 
-use crate::args::Rgb;
-use crate::fstools::get_file_as_byte_vec;
-use crate::chip8::Chip8;
-
-#[macro_use]
-extern crate savefile_derive;
-extern crate savefile;
-
-use input::parse_input;
+use chip_8_emu::{audio::Beeper, chip8::Chip8, input::parse_input, utils::render_texture_to_target};
+use fstools::{get_file_as_byte_vec, load_state, save_state};
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
-    event::{Event, WindowEvent},
+    event::{ElementState, Event, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
 
 fn main() {
-
     // args
-    let flags = crate::args::parse_args();
+    let args = crate::args::parse_args();
 
     // setup speed
     // devide 2 as fetch and decode is on same loop
-    let runhz:u64 = flags.hz;
+    let runhz:u64 = args.options.hz;
     let delay:u64 = 1000/runhz;
     let satisfiedruntimes: u64 = (1000/60)/delay;
 
     // setup cpu instance
-    let mut chip8inst = Chip8::new();
-    chip8inst.display = [flags.invert_colors; 2048];
+    let mut chip8inst = Chip8::default();
+    chip8inst.display = [args.options.invert_colors; 2048];
 
     // load rom/state into chip8inst
-    let rompath = flags.rom_path.as_str();
+    let rompath = args.rom_path.as_str();
     if rompath.ends_with(".state") {
         crate::fstools::load_state(std::path::Path::new(rompath), &mut chip8inst)
     }
@@ -50,8 +38,8 @@ fn main() {
 
     let loopchip8 = chip8arc.clone();
     std::thread::spawn(move || {
-        let beeper = crate::audio::Beeper::new(flags.vol);
-        let beeperexist = beeper.is_ok() && flags.vol > 0.0;
+        let beeper = Beeper::new(args.options.vol);
+        let beeperexist = beeper.is_ok() && args.options.vol > 0.0;
         if !beeperexist {
             println!("Audio not initialized!");
         }
@@ -109,15 +97,37 @@ fn main() {
                 window_id,
             } if window_id == window.id() => *control_flow = ControlFlow::Exit,
             Event::RedrawRequested(_) => {
-                render_texture_to_target(&eventloopchip8.read().unwrap().display, pixels.get_frame(), &flags.fg, &flags.bg);
+                render_texture_to_target(&eventloopchip8.read().unwrap().display, pixels.frame_mut(), &args.options.fg, &args.options.bg);
                 pixels.render().unwrap();
             }
             Event::WindowEvent { window_id: _, event: window_ev } => match window_ev {
                 WindowEvent::KeyboardInput {input, device_id: _, is_synthetic: _ } => {
-                    parse_input(input, &mut eventloopchip8.write().unwrap(), &flags);
+                    parse_input(input, &mut eventloopchip8.write().unwrap());
+                    let pressed = (input.state == ElementState::Pressed) as u8;
+                    if let Some(virtual_keycode) = input.virtual_keycode {
+                        match virtual_keycode {
+                            VirtualKeyCode::F5 => {
+                                if pressed == 1 {
+                                    let rompath = std::path::Path::new(args.rom_path.as_str());
+                                    let statepath = rompath.with_extension("state");
+                
+                                    save_state(&statepath, &eventloopchip8.read().unwrap());
+                                }
+                            },
+                            VirtualKeyCode::F6 => {
+                                if pressed == 1 {
+                                    let rompath = std::path::Path::new(args.rom_path.as_str());
+                                    let statepath = rompath.with_extension("state");
+                
+                                    load_state(&statepath, &mut eventloopchip8.write().unwrap())
+                                }
+                            },
+                            _ => {}
+                        }
+                    }
                 }
                 WindowEvent::Resized(size) => {
-                    pixels.resize_surface(size.width, size.height);
+                    pixels.resize_surface(size.width, size.height).unwrap();
                 }
                 _ => ()
             },
@@ -125,15 +135,4 @@ fn main() {
         }
         window.request_redraw()
     });
-}
-
-fn render_texture_to_target(dispmem: &[u8; 2048], frame: &mut [u8], fg: &Rgb, bg: &Rgb) {
-    for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
-        if dispmem[i] == 1 {
-            pixel.copy_from_slice(&[fg.r, fg.g, fg.b, 0xff]);
-        }
-        else {
-            pixel.copy_from_slice(&[bg.r, bg.g, bg.b, 0xff]);
-        }
-    }
 }

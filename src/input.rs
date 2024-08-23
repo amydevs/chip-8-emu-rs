@@ -1,7 +1,5 @@
 use winit::event::{ElementState, KeyboardInput, VirtualKeyCode};
 
-use crate::{chip8::Chip8, args::Flags, fstools::{self, load_state}};
-
 static KEYMAP: [usize; 16] = [
     0x1, // 1
     0x2, // 2
@@ -21,7 +19,7 @@ static KEYMAP: [usize; 16] = [
     0xF, // F
 ];
 
-pub fn parse_input(input: KeyboardInput, chip8inst: &mut Chip8, flags: &Flags) {
+pub fn parse_input(input: KeyboardInput, chip8inst: &mut crate::chip8::Chip8) {
     let pressed = (input.state == ElementState::Pressed) as u8;
     if let Some(virtual_keycode) = input.virtual_keycode {
         match virtual_keycode {
@@ -75,24 +73,6 @@ pub fn parse_input(input: KeyboardInput, chip8inst: &mut Chip8, flags: &Flags) {
             },
             VirtualKeyCode::V=> {
                 chip8inst.keystate[KEYMAP[15]] = pressed;
-            },
-
-            // save state
-            VirtualKeyCode::F5 => {
-                if pressed == 1 {
-                    let rompath = std::path::Path::new(flags.rom_path.as_str());
-                    let statepath = rompath.with_extension("state");
-
-                    fstools::save_state(&statepath, chip8inst);
-                }
-            },
-            VirtualKeyCode::F6 => {
-                if pressed == 1 {
-                    let rompath = std::path::Path::new(flags.rom_path.as_str());
-                    let statepath = rompath.with_extension("state");
-
-                    load_state(&statepath, chip8inst)
-                }
             },
             _ => {}
         }
