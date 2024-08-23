@@ -9,7 +9,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  BUILD_ARGS: "--bin --release"
+  BUILD_ARGS: "--bin chip-8-emu-bin --release"
   SDL_VIDEODRIVER: "dummy"
   SDL_AUDIODRIVER: "disk"
 
