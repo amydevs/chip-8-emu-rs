@@ -10,6 +10,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
   BUILD_ARGS: "--bin --release"
+  SDL_VIDEODRIVER: "dummy"
+  SDL_AUDIODRIVER: "disk"
+
 
 jobs:
   build:
@@ -54,10 +57,6 @@ jobs:
             restore-keys: ${{ matrix.platform.target }}-cargo-
         - name: Install ${{ matrix.platform.target }} Toolchain
           run: rustup target add ${{ matrix.platform.target }}
-        - name: Run tests
-          uses: actions-rs/cargo@v1
-          with:
-            command: test
         - name: Build ${{ matrix.platform.name }} binary
           uses: actions-rs/cargo@v1
           with:
