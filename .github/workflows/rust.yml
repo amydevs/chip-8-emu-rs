@@ -69,14 +69,14 @@ jobs:
             args: ${{ env.BUILD_ARGS }} --target ${{ matrix.platform.target }}
         - name: Rename binary
           run: |
-            mv target/${{ matrix.platform.target }}/release/chip-8-emu${{ contains(matrix.platform.target, 'windows') && '.exe' || '' }} \
-              chip-8-emu.${{ matrix.platform.target }}${{ contains(matrix.platform.target, 'windows') && '.exe' || '' }}
+            mv target/${{ matrix.platform.target }}/release/chip-8-emu-bin${{ contains(matrix.platform.target, 'windows') && '.exe' || '' }} \
+              chip-8-emu-bin.${{ matrix.platform.target }}${{ contains(matrix.platform.target, 'windows') && '.exe' || '' }}
           shell: bash
         - name: Upload ${{ matrix.platform.name }} binary
           uses: actions/upload-artifact@v4
           with:
             name: ${{ matrix.platform.target }}
-            path: chip-8-emu.${{ matrix.platform.target }}${{ contains(matrix.platform.target, 'windows') && '.exe' || '' }}
+            path: chip-8-emu-bin.${{ matrix.platform.target }}${{ contains(matrix.platform.target, 'windows') && '.exe' || '' }}
   build-web:
     name: Build - Web
     # By default, runs on Ubuntu, otherwise, override with the desired os
