@@ -1,15 +1,18 @@
 use std::error::Error;
 
-use cpal::{traits::{HostTrait, DeviceTrait, StreamTrait}, SampleFormat, Stream, BuildStreamError};
+use cpal::{traits::{DeviceTrait, HostTrait, StreamTrait}, BuildStreamError, SampleFormat, Stream, SupportedStreamConfig};
 
 pub struct Beeper {
-    pub stream: Stream
+    device: cpal::Device,
+    supported_config: SupportedStreamConfig,
+    stream: Stream,
+    vol: f32
 }
 impl Beeper {
     pub fn new(vol: f32) -> Result<Self, Box<dyn Error>>  {
         let host = cpal::default_host();
         let device = host.default_output_device().ok_or(std::fmt::Error {})?;
-        let supported_config = device.supported_output_configs()?.next().ok_or(std::fmt::Error {})?.with_max_sample_rate();
+        let supported_config = device.default_output_config().unwrap();
         let config = supported_config.config();
         let sample_format = supported_config.sample_format();
 
@@ -19,8 +22,24 @@ impl Beeper {
             SampleFormat::U16 => run::<u16>(&device, &config, vol),
         }?;
         Ok(Self {
-            stream: streamres
+            device,
+            supported_config,
+            stream: streamres,
+            vol,
         })
+    }
+    pub fn set_vol(&mut self, vol: f32) -> Result<(), Box<dyn Error>> {
+        if self.vol != vol {
+            let sample_format = self.supported_config.sample_format();
+            let config = self.supported_config.config();
+            self.stream = match sample_format {
+                SampleFormat::F32 => run::<f32>(&self.device, &config, vol),
+                SampleFormat::I16 => run::<i16>(&self.device, &config, vol),
+                SampleFormat::U16 => run::<u16>(&self.device, &config, vol),
+            }?;
+            self.vol = vol;
+        }
+        Ok(())
     }
     pub fn play(&self) {
         self.stream.play().unwrap();

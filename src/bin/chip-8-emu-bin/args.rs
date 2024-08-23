@@ -38,7 +38,7 @@ Keypad:        Keyboard:
 
     return BinArgs {
         options: Options {
-            invert_colors: m.is_present("invert_colors") as u8,
+            invert_colors: m.is_present("invert_colors"),
             hz: m.value_of("hz").unwrap().parse::<u64>().unwrap(),
             fg: hex_to_rgb(u32::from_str_radix(m.value_of("foreground_color").unwrap(), 16).unwrap()),
             bg: hex_to_rgb(u32::from_str_radix(m.value_of("background_color").unwrap(), 16).unwrap()),

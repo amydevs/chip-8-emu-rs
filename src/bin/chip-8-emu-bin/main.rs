@@ -18,13 +18,13 @@ fn main() {
 
     // setup speed
     // devide 2 as fetch and decode is on same loop
-    let runhz:u64 = args.options.hz;
-    let delay:u64 = 1000/runhz;
-    let satisfiedruntimes: u64 = (1000/60)/delay;
+    let runhz: u64 = args.options.hz;
+    let delay: u64 = 1000 / runhz;
+    let satisfiedruntimes: u64 = (1000 / 60) /delay;
 
     // setup cpu instance
     let mut chip8inst = Chip8::default();
-    chip8inst.display = [args.options.invert_colors; 2048];
+    chip8inst.display = [args.options.invert_colors as u8; 2048];
 
     // load rom/state into chip8inst
     let rompath = args.rom_path.as_str();

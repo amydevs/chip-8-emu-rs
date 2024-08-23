@@ -17,13 +17,15 @@
   <script type="module">
       import init, * as wasm from "./pkg/chip_8_emu.js";
       await init();
-      const { Wasm } = wasm;
+      const { WasmEventLoop, WasmMainLoop } = wasm;
+      const eventLoop = new WasmEventLoop();
+
       const resp = await fetch("/roms/airplane.ch8");
-      const emu = await Wasm.create(document.body, new Uint8Array(await resp.arrayBuffer()), {});
+      const emu = await WasmMainLoop.create(document.body, new Uint8Array(await resp.arrayBuffer()), {});
+      eventLoop.attach(emu);
+      
       setTimeout(() => {
-        emu.stop();
-        console.log(emu);
-        // emu.stop();
+        eventLoop.set_options({ bg: { r: 255, g: 255, b: 255 } });
       }, 1000)
   </script>
   <div>

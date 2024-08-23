@@ -6,7 +6,7 @@ use tsify_next::Tsify;
 #[serde(default)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct Options {
-    pub invert_colors: u8,
+    pub invert_colors: bool,
     pub hz: u64,
     pub fg: RGB,
     pub bg: RGB,
@@ -15,8 +15,8 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Self {
-        Self { 
-            invert_colors: 0,
+        Self {
+            invert_colors: false,
             hz: 500,
             fg: RGB {
                 r: 255,

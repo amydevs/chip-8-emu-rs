@@ -1,14 +1,13 @@
 
 use wasm_bindgen::prelude::*;
 use web_sys::Element;
-use std::sync::{mpsc::{channel, Sender}, Arc, RwLock};
+use std::sync::{mpsc::{channel, Sender}, Arc, Mutex, RwLock};
 
-use crate::{audio::Beeper, chip8::Chip8, input::parse_input, options::Options, utils::render_texture_to_target};
+use crate::{audio::Beeper, chip8::Chip8, input::parse_input, options::{Options, RGB}, utils::render_texture_to_target};
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
-    event::{ElementState, Event, VirtualKeyCode, WindowEvent}, event_loop::{ControlFlow, EventLoop}, platform::web::EventLoopExtWebSys, window::WindowBuilder
+    event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoop}, platform::web::{EventLoopExtWebSys, WindowExtWebSys}, window::{Window, WindowBuilder}
 };
-use winit::platform::web::WindowExtWebSys;
 use gloo_console::log;
 use gloo_timers::future::TimeoutFuture;
 
@@ -18,28 +17,200 @@ pub fn init() {
     console_log::init_with_level(log::Level::Trace).expect("error initializing logger");
 }
 
-enum MainLoopMessage {
-    Stop,
+struct WasmEventLoopOptions {
+    fg: RGB,
+    bg: RGB,
+}
+
+impl From<Options> for WasmEventLoopOptions {
+    fn from(options: Options) -> Self {
+        Self {
+            bg: options.bg,
+            fg: options.fg
+        }
+    }
+}
+
+enum WasmEventLoopMessage {
+    Attach(WasmMainLoop),
+    WasmMainLoopMessage(WasmMainLoopMessage),
 }
 
 #[wasm_bindgen]
-pub struct Wasm {
-    main_loop_tx: Sender<MainLoopMessage>,
-    event_loop_tx: Sender<MainLoopMessage>,
+pub struct WasmEventLoop {
+    tx: Sender<WasmEventLoopMessage>,
+    main_loop_wrapper: Arc<Mutex<Option<WasmMainLoopWrapper>>>
 }
 
 #[wasm_bindgen]
-impl Wasm {
-    pub async fn create(parent: Element, rom: &[u8], options: Options) -> Self {
-        // setup speed
-        // devide 2 as fetch and decode is on same loop
-        let run_hz:  u64 = options.hz;
-        let delay: u64 = 1000/run_hz;
-        let satisfied_run_times: u64 = (1000/60)/delay;
+impl WasmEventLoop {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        let (tx, rx) = channel::<WasmEventLoopMessage>();
+
+        let main_loop_wrapper: Arc<Mutex<Option<WasmMainLoopWrapper>>> = Arc::new(Mutex::new(None));
+        let inst = Self {
+            tx,
+            main_loop_wrapper: main_loop_wrapper,
+        };
+
+        let future_main_loop_wrapper = inst.main_loop_wrapper.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            let event_loop = EventLoop::new();
+            event_loop.spawn(move |ev, target, control_flow,| {
+                *control_flow = ControlFlow::Poll;
+
+                if let Ok(mesg) = rx.try_recv() {
+                    match mesg {
+                        WasmEventLoopMessage::Attach(main_loop) => {
+                            if let Some(main_loop_wrapper) = future_main_loop_wrapper.lock().unwrap().as_ref() {
+                                main_loop_wrapper.main_loop.stop();
+                                main_loop_wrapper.window.canvas().remove();
+                            }
+                            let window = WindowBuilder::new().build(&target).unwrap();
+                            window.set_inner_size(winit::dpi::PhysicalSize::new(640, 320));
+                            main_loop.parent.append_child(&window.canvas()).unwrap();
+                            let window_size = window.inner_size();
+                            let pixels_main_loop_wrapper = future_main_loop_wrapper.clone();
+                            wasm_bindgen_futures::spawn_local(async move {
+                                let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
+                                let pixels = Pixels::new_async(64, 32, surface_texture).await.unwrap();
+                                *pixels_main_loop_wrapper.lock().unwrap() = Some(WasmMainLoopWrapper {
+                                    main_loop,
+                                    pixels,
+                                    window,
+                                });
+                            });
+                        },
+                        WasmEventLoopMessage::WasmMainLoopMessage(mesg) => {
+                            match mesg {
+                                WasmMainLoopMessage::Stop => {
+                                    if let Some(main_loop_wrapper) = future_main_loop_wrapper.lock().unwrap().as_ref() {
+                                        main_loop_wrapper.main_loop.tx.send(mesg).unwrap();
+                                        main_loop_wrapper.window.canvas().remove();
+                                    }
+                                    *future_main_loop_wrapper.lock().unwrap() = None;
+                                }
+                                _ => {
+                                    if let Some(main_loop_wrapper) = future_main_loop_wrapper.lock().unwrap().as_mut() {
+                                        main_loop_wrapper.main_loop.tx.send(mesg).unwrap();
+                                    }
+                                }
+                            }
+                        }
+                    };
+                }
+
+                if let Some(main_loop_wrapper) = future_main_loop_wrapper.lock().unwrap().as_mut() {
+                    let main_loop = &mut main_loop_wrapper.main_loop;
+                    let pixels = &mut main_loop_wrapper.pixels;
+                    let window = &mut main_loop_wrapper.window;
+                    match ev {
+                        Event::RedrawRequested(_) => {
+                            render_texture_to_target(&main_loop.chip8.read().unwrap().display, pixels.frame_mut(), &main_loop.event_loop_options.fg, &main_loop.event_loop_options.bg);
+                            pixels.render().unwrap();
+                        }
+                        Event::WindowEvent { window_id: _, event: ref window_ev } => match window_ev {
+                            WindowEvent::KeyboardInput {input, device_id: _, is_synthetic: _ } => {
+                                parse_input(*input, &mut main_loop.chip8.write().unwrap());
+                                // let pressed = (input.state == ElementState::Pressed) as u8;
+                                // if let Some(virtual_keycode) = input.virtual_keycode {
+                                //     match virtual_keycode {
+                                //         VirtualKeyCode::F5 => {
+                                //             if pressed == 1 {
+                                //             }
+                                //         },
+                                //         VirtualKeyCode::F6 => {
+                                //             if pressed == 1 {
+                                //             }
+                                //         },
+                                //         _ => {}
+                                //     }
+                                // }
+                            }
+                            // WindowEvent::Resized(size) => {
+                            //     pixels.resize_surface(size.width, size.height).unwrap();
+                            // }
+                            _ => ()
+                        },
+                        _ => (),
+                    }
+                    window.request_redraw()
+                }
+            });
+        });
+        inst
+    }
     
+    pub fn attach(&mut self, main_loop: WasmMainLoop) {
+        self.tx.send(WasmEventLoopMessage::Attach(main_loop)).unwrap()
+    }
+
+    pub fn detach(&self) {
+        self.tx.send(
+            WasmEventLoopMessage::WasmMainLoopMessage(
+                WasmMainLoopMessage::Stop
+            )
+        ).unwrap();
+    }
+
+    pub fn set_options(&mut self, options: Options) {
+        if let Some(main_loop_wrapper) = self.main_loop_wrapper.lock().unwrap().as_mut() {
+            main_loop_wrapper.main_loop.event_loop_options = WasmEventLoopOptions::from(options);
+        }
+        self.tx.send(
+            WasmEventLoopMessage::WasmMainLoopMessage(
+                WasmMainLoopMessage::SetOptions(WasmMainLoopOptions::from(options))
+            )
+        ).unwrap();
+    }
+}
+
+// Main loop stuff
+
+struct WasmMainLoopWrapper {
+    main_loop: WasmMainLoop,
+    pixels: Pixels,
+    window: Window,
+}
+
+struct WasmMainLoopOptions {
+    invert_colors: bool,
+    hz: u64,
+    vol: f32,
+}
+
+impl From<Options> for WasmMainLoopOptions {
+    fn from(options: Options) -> Self {
+        Self {
+            invert_colors: options.invert_colors,
+            hz: options.hz,
+            vol: options.vol,
+        }
+    }
+}
+
+enum WasmMainLoopMessage {
+    Stop,
+    SetOptions(WasmMainLoopOptions),
+}
+
+#[wasm_bindgen]
+pub struct WasmMainLoop {
+    tx: Sender<WasmMainLoopMessage>,
+    chip8: Arc<RwLock<Chip8>>,
+    parent: Element,
+    event_loop_options: WasmEventLoopOptions,
+}
+
+#[wasm_bindgen]
+impl WasmMainLoop {
+    pub async fn create(parent: Element, rom: &[u8], options: Options) -> Self {
+        let mut main_loop_options = WasmMainLoopOptions::from(options);
         // setup cpu instance
         let mut chip8_inst = Chip8::default();
-        chip8_inst.display = [options.invert_colors; 2048];
+        let mut invert_colors: bool = main_loop_options.invert_colors;
+        chip8_inst.display = [invert_colors as u8; 2048];
     
         // load rom/state into chip8inst
         chip8_inst.load_program(rom);
@@ -47,22 +218,48 @@ impl Wasm {
         let chip8_arc = Arc::new(RwLock::new(chip8_inst));
     
         let main_loop_chip8 = chip8_arc.clone();
-        let (main_loop_tx, main_loop_rx) = channel::<MainLoopMessage>();
+        let (tx, rx) = channel::<WasmMainLoopMessage>();
         wasm_bindgen_futures::spawn_local(async move {
-            let beeper = Beeper::new(options.vol);
-            let beeperexist = beeper.is_ok() && options.vol > 0.0;
-            if !beeperexist {
+            let mut beeper = Beeper::new(main_loop_options.vol);
+            if !beeper.is_err() {
                 log!("Audio not initialized!");
             }
     
             let mut run_times = 0;
             loop {
-                if  let Ok(mesg) = main_loop_rx.try_recv() {
+                let run_hz:  u64 = main_loop_options.hz;
+                let delay: u64 = 1000 / run_hz;
+                let next_frame_time = js_sys::Date::now() as u64 + delay;
+                let satisfied_run_times: u64 = (1000 / 60) / delay;
+
+                if let Ok(beeper) = beeper.as_mut() {
+                    beeper.set_vol(main_loop_options.vol).unwrap();
+                }
+                if main_loop_options.invert_colors != invert_colors {
+                    invert_colors = main_loop_options.invert_colors;
+                    main_loop_chip8
+                        .write()
+                        .unwrap()
+                        .display
+                        .iter_mut()
+                        .for_each(|x| {
+                            if *x > 0 {
+                                *x = 0;
+                            }
+                            else {
+                                *x = 1;
+                            }
+                        });
+                }
+            
+                if let Ok(mesg) = rx.try_recv() {
                     match mesg {
-                        MainLoopMessage::Stop => break,
+                        WasmMainLoopMessage::Stop => break,
+                        WasmMainLoopMessage::SetOptions(mesg) => {
+                            main_loop_options = mesg;
+                        },
                     }
                 }
-                let next_frame_time = js_sys::Date::now() as u64 + delay;
                 
                 // timer stuff
                 if run_times >= satisfied_run_times {
@@ -70,12 +267,12 @@ impl Wasm {
                         main_loop_chip8.write().unwrap().delay_timer -= 1;
                     }
                     if main_loop_chip8.read().unwrap().sound_timer > 0 {
-                        if beeperexist {
+                        if beeper.is_ok() && main_loop_options.vol > 0.0 {
                             beeper.as_ref().unwrap().play();
                         }
                         main_loop_chip8.write().unwrap().sound_timer -= 1;
                     }
-                    else if beeperexist {
+                    else if beeper.is_ok() && main_loop_options.vol > 0.0 {
                         beeper.as_ref().unwrap().pause();
                     }
     
@@ -93,82 +290,21 @@ impl Wasm {
                 }
             }
         });
-    
-        // setup opengl
-        let event_loop = EventLoop::new();
-        let window = WindowBuilder::new().build(&event_loop).unwrap();
-        let canvas_element = web_sys::Element::from(window.canvas());
-        parent.append_child(&canvas_element).unwrap();
-        let mut pixels = {
-            let window_size = window.inner_size();
-            let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-            Pixels::new_async(64, 32, surface_texture).await.unwrap()
-        };
-    
-        let event_loop_chip8 = chip8_arc.clone();
-        let (event_loop_tx, event_loop_rx) = channel::<MainLoopMessage>();
-        wasm_bindgen_futures::spawn_local(async move {
-            event_loop.spawn(move |ev, _, control_flow| {
-                *control_flow = ControlFlow::Poll;
 
-
-                if  let Ok(mesg) = event_loop_rx.try_recv() {
-                    match mesg {
-                        MainLoopMessage::Stop => {
-                            *control_flow = ControlFlow::Exit;
-                            canvas_element.remove();
-                            return;
-                        },
-                    }
-                }
-
-                match ev {
-                    Event::WindowEvent {
-                        event: WindowEvent::CloseRequested,
-                        window_id,
-                    } if window_id == window.id() => *control_flow = ControlFlow::Exit,
-                    Event::RedrawRequested(_) => {
-                        render_texture_to_target(&event_loop_chip8.read().unwrap().display, pixels.frame_mut(), &options.fg, &options.bg);
-                        pixels.render().unwrap();
-                    }
-                    Event::WindowEvent { window_id: _, event: window_ev } => match window_ev {
-                        WindowEvent::KeyboardInput {input, device_id: _, is_synthetic: _ } => {
-                            parse_input(input, &mut event_loop_chip8.write().unwrap());
-                            let pressed = (input.state == ElementState::Pressed) as u8;
-                            if let Some(virtual_keycode) = input.virtual_keycode {
-                                match virtual_keycode {
-                                    VirtualKeyCode::F5 => {
-                                        if pressed == 1 {
-                                        }
-                                    },
-                                    VirtualKeyCode::F6 => {
-                                        if pressed == 1 {
-                                        }
-                                    },
-                                    _ => {}
-                                }
-                            }
-                        }
-                        WindowEvent::Resized(size) => {
-                            pixels.resize_surface(size.width, size.height).unwrap();
-                        }
-                        _ => ()
-                    },
-                    _ => (),
-                }
-
-                window.request_redraw()
-            });
-        });
-        
         Self {
-            event_loop_tx,
-            main_loop_tx,
+            tx,
+            chip8: chip8_arc,
+            parent,
+            event_loop_options: WasmEventLoopOptions::from(options),
         }
     }
-    pub fn stop(self) {
-        self.event_loop_tx.send(MainLoopMessage::Stop).unwrap();
-        self.main_loop_tx.send(MainLoopMessage::Stop).unwrap();
-        drop(self);
+
+    pub fn stop(&self) {
+        self.tx.send(WasmMainLoopMessage::Stop).unwrap();
+    }
+
+    pub fn set_options(&mut self, options: Options) {
+        self.event_loop_options = WasmEventLoopOptions::from(options);
+        self.tx.send(WasmMainLoopMessage::SetOptions(WasmMainLoopOptions::from(options))).unwrap();
     }
 }
