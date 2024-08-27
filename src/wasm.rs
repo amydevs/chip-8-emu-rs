@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::Element;
 use std::sync::{mpsc::{channel, Sender}, Arc, Mutex, RwLock};
 
-use crate::{audio::Beeper, chip8::Chip8, input::parse_input, options::{Options, RGB}, utils::render_texture_to_target};
+use crate::{audio::Beeper, chip8::Chip8, input::{parse_input, KEYMAP}, options::{Options, RGB}, utils::render_texture_to_target};
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
     event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoop}, platform::web::{EventLoopExtWebSys, WindowExtWebSys}, window::{Window, WindowBuilder}
@@ -164,6 +164,24 @@ impl WasmEventLoop {
             )
         ).unwrap();
     }
+
+    pub fn press(&self, key: u8) {
+        if !KEYMAP.contains(&(key as usize)) {
+            return;
+        }
+        if let Some(main_loop_wrapper) = self.main_loop_wrapper.lock().unwrap().as_ref() {
+            main_loop_wrapper.main_loop.chip8.write().unwrap().keystate[key as usize] = 1;
+        }
+    }
+
+    pub fn unpress(&self, key: u8) {
+        if !KEYMAP.contains(&(key as usize)) {
+            return;
+        }
+        if let Some(main_loop_wrapper) = self.main_loop_wrapper.lock().unwrap().as_ref() {
+            main_loop_wrapper.main_loop.chip8.write().unwrap().keystate[key as usize] = 0;
+        }
+    }
 }
 
 // Main loop stuff
@@ -306,5 +324,19 @@ impl WasmMainLoop {
     pub fn set_options(&mut self, options: Options) {
         self.event_loop_options = WasmEventLoopOptions::from(options);
         self.tx.send(WasmMainLoopMessage::SetOptions(WasmMainLoopOptions::from(options))).unwrap();
+    }
+
+    pub fn press(&self, key: u8) {
+        if !KEYMAP.contains(&(key as usize)) {
+            return;
+        }
+        self.chip8.write().unwrap().keystate[key as usize] = 1;
+    }
+
+    pub fn unpress(&self, key: u8) {
+        if !KEYMAP.contains(&(key as usize)) {
+            return;
+        }
+        self.chip8.write().unwrap().keystate[key as usize] = 0;
     }
 }

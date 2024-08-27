@@ -1,6 +1,6 @@
 use winit::event::{ElementState, KeyboardInput, VirtualKeyCode};
 
-static KEYMAP: [usize; 16] = [
+pub static KEYMAP: [usize; 16] = [
     0x1, // 1
     0x2, // 2
     0x3, // 3
