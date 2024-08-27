@@ -1,6 +1,6 @@
-use std::error::Error;
+use cpal::{traits::{DeviceTrait, HostTrait, StreamTrait}, SampleFormat, Stream, StreamError, SupportedStreamConfig};
 
-use cpal::{traits::{DeviceTrait, HostTrait, StreamTrait}, BuildStreamError, SampleFormat, Stream, SupportedStreamConfig};
+use crate::errors::BeeperError;
 
 pub struct Beeper {
     device: cpal::Device,
@@ -9,9 +9,9 @@ pub struct Beeper {
     vol: f32
 }
 impl Beeper {
-    pub fn new(vol: f32) -> Result<Self, Box<dyn Error>>  {
+    pub fn new(vol: f32) -> Result<Self, BeeperError>  {
         let host = cpal::default_host();
-        let device = host.default_output_device().ok_or(std::fmt::Error {})?;
+        let device = host.default_output_device().ok_or(BeeperError::NoDefaultOutputDevice)?;
         let supported_config = device.default_output_config().unwrap();
         let config = supported_config.config();
         let sample_format = supported_config.sample_format();
@@ -28,7 +28,7 @@ impl Beeper {
             vol,
         })
     }
-    pub fn set_vol(&mut self, vol: f32) -> Result<(), Box<dyn Error>> {
+    pub fn set_vol(&mut self, vol: f32) -> Result<(), BeeperError> {
         if self.vol != vol {
             let sample_format = self.supported_config.sample_format();
             let config = self.supported_config.config();
@@ -49,7 +49,7 @@ impl Beeper {
     }
 }
 
-pub fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig, vol: f32) -> Result<Stream, BuildStreamError>
+pub fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig, vol: f32) -> Result<Stream, BeeperError>
 where
     T: cpal::Sample,
 {
@@ -63,15 +63,20 @@ where
         ((sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sample_rate).sin() / 6.0) * vol
     };
 
-    let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
+    #[cfg(not(target_arch = "wasm32"))]
+    let err_fn = |err: StreamError| eprintln!("an error occurred on stream: {}", err);
 
+    #[cfg(target_arch = "wasm32")]
+    let err_fn = |err: StreamError| { gloo_console::log!("an error occurred on stream: {}", err.to_string()) };
     
-    device.build_output_stream(
-        config,
-        move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
-            write_data(data, channels, &mut next_value)
-        },
-        err_fn,
+    Ok(
+        device.build_output_stream(
+            config,
+            move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
+                write_data(data, channels, &mut next_value)
+            },
+            err_fn,
+        )?
     )
 }
 

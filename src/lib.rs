@@ -1,4 +1,5 @@
 pub mod chip8;
+pub mod errors;
 pub mod input;
 pub mod audio;
 pub mod options;

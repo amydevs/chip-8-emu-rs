@@ -347,6 +347,7 @@ dependencies = [
  "savefile",
  "savefile-derive",
  "serde",
+ "thiserror",
  "tsify-next",
  "wasm-bindgen",
  "wasm-bindgen-futures",
