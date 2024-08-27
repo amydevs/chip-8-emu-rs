@@ -112,7 +112,9 @@ impl WasmEventLoop {
                         }
                         Event::WindowEvent { window_id: _, event: ref window_ev } => match window_ev {
                             WindowEvent::KeyboardInput {input, device_id: _, is_synthetic: _ } => {
-                                parse_input(*input, &mut main_loop.chip8.write().unwrap());
+                                if let Some((key, pressed)) = parse_input(*input) {
+                                    main_loop.tx.send(WasmMainLoopMessage::SetKey(key, pressed)).unwrap();
+                                }
                                 // let pressed = (input.state == ElementState::Pressed) as u8;
                                 // if let Some(virtual_keycode) = input.virtual_keycode {
                                 //     match virtual_keycode {
@@ -165,22 +167,12 @@ impl WasmEventLoop {
         ).unwrap();
     }
 
-    pub fn press(&self, key: u8) {
-        if !KEYMAP.contains(&(key as usize)) {
-            return;
-        }
-        if let Some(main_loop_wrapper) = self.main_loop_wrapper.lock().unwrap().as_ref() {
-            main_loop_wrapper.main_loop.chip8.write().unwrap().keystate[key as usize] = 1;
-        }
-    }
-
-    pub fn unpress(&self, key: u8) {
-        if !KEYMAP.contains(&(key as usize)) {
-            return;
-        }
-        if let Some(main_loop_wrapper) = self.main_loop_wrapper.lock().unwrap().as_ref() {
-            main_loop_wrapper.main_loop.chip8.write().unwrap().keystate[key as usize] = 0;
-        }
+    pub fn set_key(&self, key: u8, pressed: bool) {
+        self.tx.send(
+            WasmEventLoopMessage::WasmMainLoopMessage(
+                WasmMainLoopMessage::SetKey(key as usize, pressed)
+            )
+        ).unwrap();
     }
 }
 
@@ -211,6 +203,7 @@ impl From<Options> for WasmMainLoopOptions {
 enum WasmMainLoopMessage {
     Stop,
     SetOptions(WasmMainLoopOptions),
+    SetKey(usize, bool),
 }
 
 #[wasm_bindgen]
@@ -276,6 +269,13 @@ impl WasmMainLoop {
                         WasmMainLoopMessage::SetOptions(mesg) => {
                             main_loop_options = mesg;
                         },
+                        WasmMainLoopMessage::SetKey(key, pressed) => {
+                            if !KEYMAP.contains(&(key as usize)) {
+                                continue;
+                            }
+                            main_loop_chip8.write().unwrap().keystate[key] = pressed as u8;
+                        
+                        }
                     }
                 }
                 
@@ -326,17 +326,9 @@ impl WasmMainLoop {
         self.tx.send(WasmMainLoopMessage::SetOptions(WasmMainLoopOptions::from(options))).unwrap();
     }
 
-    pub fn press(&self, key: u8) {
-        if !KEYMAP.contains(&(key as usize)) {
-            return;
-        }
-        self.chip8.write().unwrap().keystate[key as usize] = 1;
-    }
-
-    pub fn unpress(&self, key: u8) {
-        if !KEYMAP.contains(&(key as usize)) {
-            return;
-        }
-        self.chip8.write().unwrap().keystate[key as usize] = 0;
+    pub fn set_key(&self, key: u8, pressed: bool) {
+        self.tx.send(
+            WasmMainLoopMessage::SetKey(key as usize, pressed)
+        ).unwrap();
     }
 }

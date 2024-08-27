@@ -102,7 +102,9 @@ fn main() {
             }
             Event::WindowEvent { window_id: _, event: window_ev } => match window_ev {
                 WindowEvent::KeyboardInput {input, device_id: _, is_synthetic: _ } => {
-                    parse_input(input, &mut eventloopchip8.write().unwrap());
+                    if let Some((key, pressed)) = parse_input(input) {
+                        eventloopchip8.write().unwrap().keystate[key] = pressed as u8;
+                    }
                     let pressed = (input.state == ElementState::Pressed) as u8;
                     if let Some(virtual_keycode) = input.virtual_keycode {
                         match virtual_keycode {
