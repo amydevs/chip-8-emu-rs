@@ -60,7 +60,7 @@ impl WasmEventLoop {
             event_loop.spawn(move |ev, target, control_flow,| {
                 *control_flow = ControlFlow::Poll;
 
-                if let Ok(mesg) = rx.try_recv() {
+                for mesg in rx.try_iter() {
                     match mesg {
                         WasmEventLoopMessage::Attach(main_loop) => {
                             if let Some(main_loop_wrapper) = future_main_loop_wrapper.lock().unwrap().as_ref() {
@@ -269,8 +269,8 @@ impl WasmMainLoop {
                             }
                         });
                 }
-            
-                if let Ok(mesg) = rx.try_recv() {
+
+                for mesg in rx.try_iter() {
                     match mesg {
                         WasmMainLoopMessage::Stop => break,
                         WasmMainLoopMessage::SetOptions(mesg) => {
