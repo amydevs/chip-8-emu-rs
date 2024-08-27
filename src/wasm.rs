@@ -273,7 +273,7 @@ impl WasmMainLoop {
                             if !KEYMAP.contains(&(key as usize)) {
                                 continue;
                             }
-                            main_loop_chip8.write().unwrap().keystate[key] = pressed as u8;
+                            main_loop_chip8.write().unwrap().key_state[key] = pressed as u8;
                         
                         }
                     }
